@@ -11,4 +11,5 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::apiResource('brands', BrandController::class);
+Route::apiResource('categories', CategoryController::class);
 Route::apiResource('showrooms', ShowroomController::class);
