@@ -12,7 +12,10 @@ class ProductController extends Controller
     public function index()
     {
         try {
-            $products = Product::all();
+            $products = Product::with([
+                'brand:id,name',
+                'category:id,name'
+            ])->get();
             return response()->json($products, Response::HTTP_OK);
         } catch (\Exception $e) {
             return response()->json([
