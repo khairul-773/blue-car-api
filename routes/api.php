@@ -7,6 +7,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ShowroomController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\PartytransactionController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -17,3 +18,4 @@ Route::apiResource('categories', CategoryController::class);
 Route::apiResource('showrooms', ShowroomController::class);
 Route::apiResource('products', ProductController::class);
 Route::apiResource('suppliers', SupplierController::class);
+Route::apiResource('partytransactions', PartytransactionController::class);
