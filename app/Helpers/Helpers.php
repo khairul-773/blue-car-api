@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Supplier;
+use App\Models\Partytransaction;
+
 if (!function_exists('getSupplierBalance')) {
     function getSupplierBalance($code=null, $id=null)
     {
@@ -9,7 +12,7 @@ if (!function_exists('getSupplierBalance')) {
             // define default amount
             $initital_balance = $debit = $credit = $commission = $balance = 0;
             // get supplier info
-            $supplier_info = Party::with('partytransaction')->where('code','=', $code)->first();
+            $supplier_info = Supplier::with('partytransaction')->where('code','=', $code)->first();
             if(!empty($id)){
                 $partytransaction = Partytransaction::where([['id', '<', $id], ['party_code', '=', $code]])->get();
                 

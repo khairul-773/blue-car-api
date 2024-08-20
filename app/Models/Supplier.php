@@ -29,4 +29,18 @@ class Supplier extends Model
             $supplier->code = $nextCode;
         });
     }
+
+    public function showroom()
+    {
+        return $this->belongsTo(Showroom::class, 'showroom_id');
+    }
+
+    public function partytransaction()
+    {  
+        return $this->hasMany(Partytransaction::class, 'party_code', 'code')
+        ->selectRaw('partytransactions.party_code, SUM(partytransactions.credit) as credit,
+        SUM(partytransactions.debit) as debit,
+        SUM(partytransactions.commission) as commission') 
+        ->groupBy('partytransactions.party_code');
+    }
 }

@@ -1,12 +1,13 @@
 <?php
 
 namespace App\Http\Controllers;
-use App\Http\Resources\PartytransactionResource;
 
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use App\Models\Partytransaction;
 use App\Models\Supplier;
 use App\Models\Showroom;
-use Illuminate\Http\Request;
 
 class PartytransactionController extends Controller
 {
@@ -15,51 +16,55 @@ class PartytransactionController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request)
-    {   
-        $where = [];
-        
-        if(!empty($request->from_date) || !empty($request->to_date)){
-            if(!empty($request->from_date)){
-                $where[] = ['partytransactions.transaction_at','>=', $request->from_date];
-            }
-            if(!empty($request->to_date)){
-                $where[] = ['partytransactions.transaction_at','<=', $request->to_date];
-            }
-        }else{
-            $where[] = ['partytransactions.transaction_at','=', date("Y-m-d")];
-        }
-
-        if(!empty($request->showroom_id)){
-            $where[] = ['partytransactions.showroom_id','=',$request->showroom_id];
-        } 
-        if(!empty($request->party_code)){
-            $where[] = ['partytransactions.party_code','=',$request->party_code];
-        }
-        
-        $data =
-            Partytransaction::addSelect(['name' => Supplier::select('name')
-            ->whereColumn('code', 'partytransactions.party_code')])
-            ->addSelect(['showrooms' => Showroom::select('name')
-            ->whereColumn('id', 'partytransactions.showroom_id')])
-            ->where($where)
-			->orderBy("id", "desc")
-            ->paginate($request->per_page); 
-            
-            $data =
-            Partytransaction::all();
-        return response()
-            ->json($data, 200);
-    }
-
-    /** 
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
+    public function index()
     {
-        //
+        try {
+            $where = [];
+
+            $from_date = request()->query('from_date');
+            $to_date = request()->query('to_date');
+            $showroom_id = request()->query('showroom_id');
+            $party_code = request()->query('party_code');
+
+            if (!empty($from_date) || !empty($to_date)) {
+                if (!empty($from_date)) {
+                    $where[] = ['partytransactions.transaction_at', '>=', $from_date];
+                }
+                if (!empty($to_date)) {
+                    $where[] = ['partytransactions.transaction_at', '<=', $to_date];
+                }
+            }
+
+            if (!empty($showroom_id)) {
+                $where[] = ['partytransactions.showroom_id', '=', $showroom_id];
+            }
+            if (!empty($party_code)) {
+                $where[] = ['partytransactions.party_code', '=', $party_code];
+            }
+
+            $query = Partytransaction::addSelect([
+                    'name' => Supplier::select('name')
+                        ->whereColumn('code', 'partytransactions.party_code')
+                ])
+                ->addSelect([
+                    'showrooms' => Showroom::select('name')
+                        ->whereColumn('id', 'partytransactions.showroom_id')
+                ]);
+
+            if (!empty($where)) {
+                $query->where($where);
+            }
+
+            $data = $query->orderBy("id", "desc")->get();
+            // ->paginate(request()->query('per_page')); // Uncomment if you want to use pagination
+
+            return response()->json($data, Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to fetch party transactions.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**
@@ -70,52 +75,57 @@ class PartytransactionController extends Controller
      */
     public function store(Request $request)
     {
-        $data = new Partytransaction;
+        DB::beginTransaction();
+        try {
+            $data = new Partytransaction;
 
-        $data->transaction_at = $request->transaction_at;
-        $data->paid_by = $request->paid_by;
-        $data->remark = $request->remark;
-        $data->party_code = $request->party_code;
-		$data->transaction_type = $request->transaction_type;
-        $data->transaction_method = $request->transaction_method;
-        $data->showroom_id = $request->showroom_id;
+            $data->transaction_at = $request->transaction_at;
+            $data->paid_by = $request->paid_by;
+            $data->remark = $request->remark;
+            $data->party_code = $request->party_code;
+            $data->transaction_type = $request->transaction_type;
+            $data->transaction_method = $request->transaction_method;
+            $data->showroom_id = $request->showroom_id;
 
-        // generate transaction invoice
-        $invoice = rand(100000, 999999);
-        while (Partytransaction::where('relation', $invoice)->first())
-        {
-            $invoice = rand(100000, 999999);
-        }
-        $data->relation = $invoice;
-        
-        if($request->balance_status== 'Payable'){
-            if($request->transaction_type == 'receive'){
-                $data['credit'] = $request->payment;
-                $data['debit'] = 0;
-            }else{
-                $data['debit'] = $request->payment;
-                $data['credit'] = 0;
+            $data->relation = Partytransaction::generateUniqueInvoice();
+
+            if ($request->balance_status == 'Payable') {
+                if ($request->transaction_type == 'receive') {
+                    $data['credit'] = $request->payment;
+                    $data['debit'] = 0;
+                } else {
+                    $data['debit'] = $request->payment;
+                    $data['credit'] = 0;
+                }
+            } else {
+                if ($request->transaction_type == 'receive') {
+                    $data['debit'] = 0;
+                    $data['credit'] = $request->payment;
+                } else {
+                    $data['credit'] = 0;
+                    $data['debit'] = $request->payment;
+                }
             }
-        }else{
-            if($request->transaction_type == 'receive'){
-                $data['debit'] = 0;
-                $data['credit'] = $request->payment;
-            }else{
-                $data['credit'] = 0;
-                $data['debit'] = $request->payment;
-            }
+
+            $data->commission = $request->commission ?? 0;
+            $data->status = "transaction";
+            $data->transaction_by = "supplier";
+
+            $data->save();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => 'Party Transaction successfully added.',
+                'data' => $data,
+            ], Response::HTTP_CREATED);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to create party transaction.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        $data->commission       = $request->commission ? $request->commission : 0;
-        $data->status           = "transaction";
-        $data->transaction_by   = "suplier";
-
-        $data->save();
-
-        $data = ['success' => 'Party Transaction successfully added.'];
-        
-        return response()
-        ->json($data, 200);
     }
 
     /**
@@ -126,29 +136,22 @@ class PartytransactionController extends Controller
      */
     public function show($partytransaction)
     {
-        $data = Partytransaction::with('party:code,name,id,mobile,address')->find($partytransaction);
-        
-        $current_balance = getSupplierBalance($data->party_code);
-        $previuse_balance = getSupplierBalance($data->party_code, $data->id);
-        
-        $data['previuse_balance'] = (!empty($previuse_balance) ? $previuse_balance['balance'].' ['.$previuse_balance['status'].']': 0);
-        $data['current_balance'] = (!empty($current_balance) ? $current_balance['balance'].' ['.$current_balance['status'].']': 0);
+        try {
+            $data = Partytransaction::with('party:code,name,id,mobile,address')->findOrFail($partytransaction);
+            
+            $current_balance = getSupplierBalance($data->party_code);
+            $previous_balance = getSupplierBalance($data->party_code, $data->id);
+            
+            $data['previous_balance'] = (!empty($previous_balance) ? $previous_balance['balance'].' ['.$previous_balance['status'].']' : 0);
+            $data['current_balance'] = (!empty($current_balance) ? $current_balance['balance'].' ['.$current_balance['status'].']' : 0);
 
-        return response()
-        ->json($data, 200);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Partytransaction  $partytransaction
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id)
-    {   
-        $data =  new PartytransactionResource(Partytransaction::with("party")->find($id));
-        return response()
-        ->json($data, 200);
+            return response()->json($data, Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Party transaction not found.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_NOT_FOUND);
+        }
     }
 
     /**
@@ -158,59 +161,104 @@ class PartytransactionController extends Controller
      * @param  \App\Models\Partytransaction  $partytransaction
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request)
+    public function update(Request $request, $id)
     {
-        $data = Partytransaction::find($request->id);
+        DB::beginTransaction();
+        try {
+            $data = Partytransaction::findOrFail($id);
 
-        $data->transaction_at = $request->date;
-        $data->paid_by = $request->paid_by;
-        $data->remark = $request->remark;
-		$data->transaction_type = $request->transaction_type;
-        $data->transaction_method = $request->transaction_method;
+            $data->transaction_at = $request->transaction_at;
+            $data->paid_by = $request->paid_by;
+            $data->remark = $request->remark;
+            $data->transaction_type = $request->transaction_type;
+            $data->transaction_method = $request->transaction_method;
 
-        if($request->balance_status== 'Payable'){
-            if($request->transaction_type == 'receive'){
-                $data['credit'] = $request->payment;
-                $data['debit'] = 0;
-            }else{
-                $data['debit'] = $request->payment;
-                $data['credit'] = 0;
+            if ($request->balance_status == 'Payable') {
+                if ($request->transaction_type == 'receive') {
+                    $data['credit'] = $request->payment;
+                    $data['debit'] = 0;
+                } else {
+                    $data['debit'] = $request->payment;
+                    $data['credit'] = 0;
+                }
+            } else {
+                if ($request->transaction_type == 'receive') {
+                    $data['debit'] = 0;
+                    $data['credit'] = $request->payment;
+                } else {
+                    $data['credit'] = 0;
+                    $data['debit'] = $request->payment;
+                }
             }
-        }else{
-            if($request->transaction_type == 'receive'){
-                $data['debit'] = 0;
-                $data['credit'] = $request->payment;
-            }else{
-                $data['credit'] = 0;
-                $data['debit'] = $request->payment;
-            }
+            $data->commission = $request->commission;
+
+            $data->save();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => 'Party Transaction successfully updated.',
+                'data' => $data,
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to update party transaction.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-        $data->commission = $request->commission;
-        $data->save();
-
-        $data = ['success' => 'Party Transaction successfully update.'];
-        
-        return response()
-        ->json($data, 200);
     }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
     public function destroy($id)
     {
-        if (Partytransaction::find($id)->delete())
-        {
-            $data =
-            Partytransaction::addSelect(['name' => Supplier::select('name')
-            ->whereColumn('code', 'partytransactions.party_code')])
-            ->addSelect(['warehouse_name' => Warehouse::select('name')
-            ->whereColumn('id', 'partytransactions.showroom_id')])
-			->orderBy("id", "desc")
-            ->paginate(12); 
-        return response()
-            ->json($data, 200);
+        try {
+            $partytransaction = Partytransaction::findOrFail($id);
+            $partytransaction->delete();
+
+            $data = Partytransaction::addSelect([
+                'name' => Supplier::select('name')
+                    ->whereColumn('code', 'partytransactions.party_code')
+            ])
+            ->addSelect([
+                'showroom_name' => Showroom::select('name')
+                    ->whereColumn('id', 'partytransactions.showroom_id')
+            ])
+            ->orderBy("id", "desc")
+            ->get();
+
+            return response()->json(null, Response::HTTP_NO_CONTENT);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to delete party transaction.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-        else
-        {
-            $data = ['warning' => 'Supplier Transaction successfully not deleted.'];
+    }
+
+    /**
+     * Restore the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore($id)
+    {
+        try {
+            $partytransaction = Partytransaction::onlyTrashed()->findOrFail($id);
+            $partytransaction->restore();
+
+            return response()->json($partytransaction, Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to restore party transaction.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-        return response()->json($data, 200);
     }
 }

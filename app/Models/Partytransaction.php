@@ -35,4 +35,25 @@ class Partytransaction extends Model
     {
         return $this->belongsTo(Showroom::class, 'showroom_id');
     }
+
+    public static function generateUniqueInvoice()
+    {
+        $latestRelation = self::orderBy('relation', 'desc')
+            ->value('relation');
+
+        if ($latestRelation) {
+            // Increment the latest relation by 1
+            $invoice = (int)$latestRelation + 1;
+        } else {
+            // Start with 1 if no relation exists
+            $invoice = 1;
+        }
+
+        // Ensure the invoice is unique by checking if it exists in the database
+        while (self::where('relation', $invoice)->exists()) {
+            $invoice++;
+        }
+
+        return $invoice;
+    }
 }

@@ -14,7 +14,7 @@ class SupplierController extends Controller
     public function index()
     {
         try {
-            $suppliers = Supplier::all();
+            $suppliers = Supplier::with(["showroom:id,name"])->get();
             return response()->json($suppliers, Response::HTTP_OK);
         } catch (\Exception $e) {
             return response()->json([
@@ -23,7 +23,7 @@ class SupplierController extends Controller
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    
     public function store(Request $request)
     {
         try {
