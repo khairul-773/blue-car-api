@@ -81,6 +81,27 @@ class SupplierController extends Controller
         }
     }
 
+
+    public function showroomWiseSupplier($showroomId)
+    {
+        try {
+            $suppliers = Supplier::where('showroom_id', $showroomId)->get();
+            
+            if ($suppliers->isEmpty()) {
+                return response()->json([
+                    'message' => 'No suppliers found for the specified showroom.',
+                ], Response::HTTP_NOT_FOUND);
+            }
+            
+            return response()->json($suppliers, Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to fetch suppliers for the showroom.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+    
     public function update(Request $request, $id)
     {
         try {

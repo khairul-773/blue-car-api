@@ -18,4 +18,5 @@ Route::apiResource('categories', CategoryController::class);
 Route::apiResource('showrooms', ShowroomController::class);
 Route::apiResource('products', ProductController::class);
 Route::apiResource('suppliers', SupplierController::class);
+Route::get('suppliers/showroom/{showroomId}', [SupplierController::class, 'showroomWiseSupplier']);
 Route::apiResource('partytransactions', PartytransactionController::class);
