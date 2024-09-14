@@ -80,7 +80,7 @@ class PartytransactionController extends Controller
             $data = new Partytransaction;
 
             $data->transaction_at = $request->transaction_at;
-            $data->paid_by = $request->paid_by;
+            //$data->paid_by = $request->paid_by;
             $data->remark = $request->remark;
             $data->party_code = $request->party_code;
             $data->transaction_type = $request->transaction_type;
