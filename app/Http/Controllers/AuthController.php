@@ -12,7 +12,11 @@ use Illuminate\Support\Facades\Validator;
 */
 class AuthController extends Controller
 {
-    // Registration Method
+    /**
+     * Summary of register
+     * @param \Illuminate\Http\Request $request
+     * @return mixed|\Illuminate\Http\JsonResponse
+     */
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -36,7 +40,11 @@ class AuthController extends Controller
         return response()->json(['token' => $token, 'user' => $user], 201);
     }
     
-    // Login Method
+    /**
+     * Summary of login
+     * @param \Illuminate\Http\Request $request
+     * @return mixed|\Illuminate\Http\JsonResponse
+     */
     public function login(Request $request)
     {
         $user = User::where('email', $request->email)->first();
@@ -50,7 +58,11 @@ class AuthController extends Controller
         return response()->json(['token' => $token, 'user' => $user], 200);
     }
 
-    // Logout method
+    /**
+     * Summary of logout
+     * @param \Illuminate\Http\Request $request
+     * @return mixed|\Illuminate\Http\JsonResponse
+     */
     public function logout(Request $request)
     {
         // Revoke the current user's token
@@ -58,7 +70,7 @@ class AuthController extends Controller
 
         // Revoke the current user's all token
         //$request->user()->token()->delete();
-
+        
         return response()->json([
             'success' => 'Logged out successfully.'
         ], 200);
