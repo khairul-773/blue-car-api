@@ -2,25 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\DB;
 use App\Models\Partytransaction;
 use App\Models\Supplier;
 use App\Models\Showroom;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
+use App\Traits\ApiResponse;
 
 class PartytransactionController extends Controller
 {
+    use ApiResponse;
     /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
+     * Summary of index
+     * @return \Illuminate\Http\JsonResponse
      */
     public function index()
     {
         try {
             $where = [];
-
             $from_date = request()->query('from_date');
             $to_date = request()->query('to_date');
             $showroom_id = request()->query('showroom_id');
@@ -43,35 +43,29 @@ class PartytransactionController extends Controller
             }
 
             $query = Partytransaction::addSelect([
-                    'name' => Supplier::select('name')
-                        ->whereColumn('code', 'partytransactions.party_code')
-                ])
-                ->addSelect([
-                    'showrooms' => Showroom::select('name')
-                        ->whereColumn('id', 'partytransactions.showroom_id')
-                ]);
+                'name' => Supplier::select('name')
+                    ->whereColumn('code', 'partytransactions.party_code')
+            ])
+            ->addSelect([
+                'showrooms' => Showroom::select('name')
+                    ->whereColumn('id', 'partytransactions.showroom_id')
+            ]);
 
             if (!empty($where)) {
                 $query->where($where);
             }
 
             $data = $query->orderBy("id", "desc")->get();
-            // ->paginate(request()->query('per_page')); // Uncomment if you want to use pagination
 
-            return response()->json($data, Response::HTTP_OK);
+            return $this->successResponse('Party transactions fetched successfully.', $data, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to fetch party transactions.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to fetch party transactions.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
     /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Summary of store
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request)
     {
@@ -80,13 +74,11 @@ class PartytransactionController extends Controller
             $data = new Partytransaction;
 
             $data->transaction_at = $request->transaction_at;
-            //$data->paid_by = $request->paid_by;
             $data->remark = $request->remark;
             $data->party_code = $request->party_code;
             $data->transaction_type = $request->transaction_type;
             $data->transaction_method = $request->transaction_method;
             $data->showroom_id = $request->showroom_id;
-
             $data->relation = Partytransaction::generateUniqueInvoice();
 
             if ($request->balance_status == 'Payable') {
@@ -115,51 +107,31 @@ class PartytransactionController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => 'Party Transaction successfully added.',
-                'data' => $data,
-            ], Response::HTTP_CREATED);
+            return $this->successResponse('Party Transaction successfully added.', $data, Response::HTTP_CREATED);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'message' => 'Failed to create party transaction.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to create party transaction.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
     /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\Partytransaction  $partytransaction
-     * @return \Illuminate\Http\Response
+     * Summary of show
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function show($partytransaction)
+    public function show($id)
     {
         try {
-            $data = Partytransaction::with('party:code,name,id,mobile,address')->findOrFail($partytransaction);
-            
-            $current_balance = getSupplierBalance($data->party_code);
-            $previous_balance = getSupplierBalance($data->party_code, $data->id);
-            
-            $data['previous_balance'] = (!empty($previous_balance) ? $previous_balance['balance'].' ['.$previous_balance['status'].']' : 0);
-            $data['current_balance'] = (!empty($current_balance) ? $current_balance['balance'].' ['.$current_balance['status'].']' : 0);
-
-            return response()->json($data, Response::HTTP_OK);
+            $data = Partytransaction::findOrFail($id);
+            return $this->successResponse('Party transaction details retrieved successfully.', $data, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Party transaction not found.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse('Failed to retrieve party transaction.', $e->getMessage(), Response::HTTP_NOT_FOUND);
         }
     }
-
     /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Partytransaction  $partytransaction
-     * @return \Illuminate\Http\Response
+     * Summary of update
+     * @param \Illuminate\Http\Request $request
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function update(Request $request, $id)
     {
@@ -168,10 +140,11 @@ class PartytransactionController extends Controller
             $data = Partytransaction::findOrFail($id);
 
             $data->transaction_at = $request->transaction_at;
-            $data->paid_by = $request->paid_by;
             $data->remark = $request->remark;
+            $data->party_code = $request->party_code;
             $data->transaction_type = $request->transaction_type;
             $data->transaction_method = $request->transaction_method;
+            $data->showroom_id = $request->showroom_id;
 
             if ($request->balance_status == 'Payable') {
                 if ($request->transaction_type == 'receive') {
@@ -190,75 +163,35 @@ class PartytransactionController extends Controller
                     $data['debit'] = $request->payment;
                 }
             }
-            $data->commission = $request->commission;
+
+            $data->commission = $request->commission ?? 0;
+            $data->status = "transaction";
+            $data->transaction_by = "supplier";
 
             $data->save();
 
             DB::commit();
 
-            return response()->json([
-                'success' => 'Party Transaction successfully updated.',
-                'data' => $data,
-            ], Response::HTTP_OK);
+            return $this->successResponse('Party Transaction successfully updated.', $data, Response::HTTP_OK);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'message' => 'Failed to update party transaction.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to update party transaction.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
     /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * Summary of destroy
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function destroy($id)
     {
         try {
-            $partytransaction = Partytransaction::findOrFail($id);
-            $partytransaction->delete();
+            $data = Partytransaction::findOrFail($id);
+            $data->delete();
 
-            $data = Partytransaction::addSelect([
-                'name' => Supplier::select('name')
-                    ->whereColumn('code', 'partytransactions.party_code')
-            ])
-            ->addSelect([
-                'showroom_name' => Showroom::select('name')
-                    ->whereColumn('id', 'partytransactions.showroom_id')
-            ])
-            ->orderBy("id", "desc")
-            ->get();
-
-            return response()->json(null, Response::HTTP_NO_CONTENT);
+            return $this->successResponse('Party Transaction successfully deleted.', null, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to delete party transaction.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Restore the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function restore($id)
-    {
-        try {
-            $partytransaction = Partytransaction::onlyTrashed()->findOrFail($id);
-            $partytransaction->restore();
-
-            return response()->json($partytransaction, Response::HTTP_OK);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to restore party transaction.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to delete party transaction.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

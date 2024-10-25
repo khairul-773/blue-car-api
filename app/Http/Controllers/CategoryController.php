@@ -6,22 +6,29 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
+use App\Traits\ApiResponse;
 
 class CategoryController extends Controller
 {
+    use ApiResponse;
+    /**
+     * Summary of index
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index()
     {
         try {
             $categories = Category::all();
-            return response()->json($categories, Response::HTTP_OK);
+            return $this->successResponse('Categories fetched successfully', $categories, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to fetch categories.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to fetch categories.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    /**
+     * Summary of store
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function store(Request $request)
     {
         try {
@@ -31,33 +38,33 @@ class CategoryController extends Controller
             ]);
 
             $category = Category::create($validated);
-            return response()->json($category, Response::HTTP_CREATED);
+            return $this->successResponse('Category created successfully', $category, Response::HTTP_CREATED);
         } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation Error',
-                'errors' => $e->validator->errors(),
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse('Validation Error', $e->validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to create category.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to create category.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    /**
+     * Summary of show
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function show($id)
     {
         try {
             $category = Category::findOrFail($id);
-            return response()->json($category, Response::HTTP_OK);
+            return $this->successResponse('Category retrieved successfully', $category, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Category not found.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse('Category not found.', $e->getMessage(), Response::HTTP_NOT_FOUND);
         }
     }
-
+    /**
+     * Summary of update
+     * @param \Illuminate\Http\Request $request
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function update(Request $request, $id)
     {
         try {
@@ -69,32 +76,27 @@ class CategoryController extends Controller
             $category = Category::findOrFail($id);
             $category->update($validated);
 
-            return response()->json($category, Response::HTTP_OK);
+            return $this->successResponse('Category updated successfully', $category, Response::HTTP_OK);
         } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation Error',
-                'errors' => $e->validator->errors(),
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse('Validation Error', $e->validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to update category.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to update category.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    /**
+     * Summary of destroy
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function destroy($id)
     {
         try {
             $category = Category::findOrFail($id);
             $category->delete();
 
-            return response()->json(null, Response::HTTP_NO_CONTENT);
+            return $this->successResponse('Category deleted successfully', null, Response::HTTP_NO_CONTENT);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to delete category.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to delete category.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

@@ -2,28 +2,34 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use App\Traits\ApiResponse;
 
 class SupplierController extends Controller
 {
+    use ApiResponse;
+    /**
+     * Summary of index
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index()
     {
         try {
             $suppliers = Supplier::with(["showroom:id,name"])->get();
-            return response()->json($suppliers, Response::HTTP_OK);
+            return $this->successResponse('Suppliers fetched successfully.', $suppliers, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to fetch suppliers.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to fetch suppliers.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-    
+    /**
+     * Summary of store
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function store(Request $request)
     {
         try {
@@ -38,70 +44,56 @@ class SupplierController extends Controller
                 'status' => 'required|in:Receivable,Payable',
             ]);
 
-            $supplier = Supplier::create([
-                'showroom_id' => $validated['showroom_id'],
-                'date' => $validated['date'],
-                'name' => $validated['name'],
-                'contact_person' => $validated['contact_person'],
-                'mobile' => $validated['mobile'],
-                'address' => $validated['address'],
-                'initial_balance' => $validated['initial_balance'],
-                'status' => $validated['status'],
-            ]);
+            $supplier = Supplier::create($validated);
 
-            return response()->json($supplier, Response::HTTP_CREATED);
+            return $this->successResponse('Supplier created successfully.', $supplier, Response::HTTP_CREATED);
         } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation Error',
-                'errors' => $e->validator->errors(),
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse('Validation Error', $e->validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to create supplier.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to create supplier.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    /**
+     * Summary of show
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function show($id)
     {
         try {
             $supplier = Supplier::findOrFail($id);
-            return response()->json($supplier, Response::HTTP_OK);
+            return $this->successResponse('Supplier fetched successfully.', $supplier, Response::HTTP_OK);
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'Supplier not found.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse('Supplier not found.', $e->getMessage(), Response::HTTP_NOT_FOUND);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to fetch supplier.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to fetch supplier.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
-
+    /**
+     * Summary of showroomWiseSupplier
+     * @param mixed $showroomId
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function showroomWiseSupplier($showroomId)
     {
         try {
             $suppliers = Supplier::where('showroom_id', $showroomId)->get();
             
             if ($suppliers->isEmpty()) {
-                return response()->json([
-                    'message' => 'No suppliers found for the specified showroom.',
-                ], Response::HTTP_NOT_FOUND);
+                return $this->errorResponse('No suppliers found for the specified showroom.', null, Response::HTTP_NOT_FOUND);
             }
             
-            return response()->json($suppliers, Response::HTTP_OK);
+            return $this->successResponse('Suppliers fetched successfully.', $suppliers, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to fetch suppliers for the showroom.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to fetch suppliers for the showroom.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-    
+    /**
+     * Summary of update
+     * @param \Illuminate\Http\Request $request
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function update(Request $request, $id)
     {
         try {
@@ -119,25 +111,18 @@ class SupplierController extends Controller
             $supplier = Supplier::findOrFail($id);
             $supplier->update($validated);
 
-            return response()->json($supplier, Response::HTTP_OK);
+            return $this->successResponse('Supplier updated successfully.', $supplier, Response::HTTP_OK);
         } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation Error',
-                'errors' => $e->validator->errors(),
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'Supplier not found.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse('Validation Error', $e->validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to update supplier.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to update supplier.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    /**
+     * Summary of destroy
+     * @param mixed $id
+     * @return mixed|\Illuminate\Http\JsonResponse
+     */
     public function destroy($id)
     {
         try {
@@ -145,36 +130,8 @@ class SupplierController extends Controller
             $supplier->delete();
 
             return response()->json(null, Response::HTTP_NO_CONTENT);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'Supplier not found.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_NOT_FOUND);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to delete supplier.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    public function restore($id)
-    {
-        try {
-            $supplier = Supplier::onlyTrashed()->findOrFail($id);
-            $supplier->restore();
-
-            return response()->json($supplier, Response::HTTP_OK);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'Supplier not found.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_NOT_FOUND);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to restore supplier.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to delete supplier.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

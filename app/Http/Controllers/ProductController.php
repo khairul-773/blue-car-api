@@ -6,9 +6,15 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
+use App\Traits\ApiResponse;
 
 class ProductController extends Controller
 {
+    use ApiResponse;
+    /**
+     * Summary of index
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index()
     {
         try {
@@ -16,15 +22,17 @@ class ProductController extends Controller
                 'brand:id,name',
                 'category:id,name'
             ])->get();
-            return response()->json($products, Response::HTTP_OK);
+
+            return $this->successResponse('Products fetched successfully', $products, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to fetch products.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to fetch products.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    /**
+     * Summary of store
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function store(Request $request)
     {
         try {
@@ -46,36 +54,36 @@ class ProductController extends Controller
                 'purchase_price' => $validated['purchase_price'],
                 'sale_price' => $validated['sale_price'],
                 'low_level' => $validated['low_level'] ?? 0,
-                'status' => 0, // Default status
+                'status' => 0,
             ]);
 
-            return response()->json($product, Response::HTTP_CREATED);
+            return $this->successResponse('Product created successfully', $product, Response::HTTP_CREATED);
         } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation Error',
-                'errors' => $e->validator->errors(),
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse('Validation error', $e->validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to create product.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to create product.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    /**
+     * Summary of show
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function show($id)
     {
         try {
             $product = Product::findOrFail($id);
-            return response()->json($product, Response::HTTP_OK);
+            return $this->successResponse('Product retrieved successfully', $product, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Product not found.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_NOT_FOUND);
+            return $this->errorResponse('Product not found.', $e->getMessage(), Response::HTTP_NOT_FOUND);
         }
     }
-
+    /**
+     * Summary of update
+     * @param \Illuminate\Http\Request $request
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function update(Request $request, $id)
     {
         try {
@@ -92,47 +100,43 @@ class ProductController extends Controller
             $product = Product::findOrFail($id);
             $product->update($validated);
 
-            return response()->json($product, Response::HTTP_OK);
+            return $this->successResponse('Product updated successfully', $product, Response::HTTP_OK);
         } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation Error',
-                'errors' => $e->validator->errors(),
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse('Validation error', $e->validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to update product.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to update product.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    /**
+     * Summary of destroy
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function destroy($id)
     {
         try {
             $product = Product::findOrFail($id);
             $product->delete();
 
-            return response()->json(null, Response::HTTP_NO_CONTENT);
+            return $this->successResponse('Product deleted successfully', null, Response::HTTP_NO_CONTENT);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to delete product.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to delete product.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    /**
+     * Summary of restore
+     * @param mixed $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function restore($id)
     {
         try {
             $product = Product::onlyTrashed()->findOrFail($id);
             $product->restore();
 
-            return response()->json($product, Response::HTTP_OK);
+            return $this->successResponse('Product restored successfully', $product, Response::HTTP_OK);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to restore product.',
-                'error' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to restore product.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
