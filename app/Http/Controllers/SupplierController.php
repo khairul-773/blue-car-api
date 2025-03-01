@@ -4,19 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Supplier;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use App\Traits\ApiResponse;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
+use App\Traits\ResponseTrait;
 
 class SupplierController extends Controller
 {
-    use ApiResponse;
+    use ResponseTrait;
+
     /**
-     * Summary of index
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
-    public function index()
+    public function index(): JsonResponse
     {
         try {
             $suppliers = Supplier::with(["showroom:id,name"])->get();
@@ -25,12 +26,12 @@ class SupplierController extends Controller
             return $this->errorResponse('Failed to fetch suppliers.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
     /**
-     * Summary of store
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * @param Request $request
+     * @return JsonResponse
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
             $validated = $request->validate([
@@ -53,12 +54,12 @@ class SupplierController extends Controller
             return $this->errorResponse('Failed to create supplier.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
     /**
-     * Summary of show
-     * @param mixed $id
-     * @return \Illuminate\Http\JsonResponse
+     * @param $id
+     * @return JsonResponse
      */
-    public function show($id)
+    public function show($id): JsonResponse
     {
         try {
             $supplier = Supplier::findOrFail($id);
@@ -69,32 +70,32 @@ class SupplierController extends Controller
             return $this->errorResponse('Failed to fetch supplier.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
     /**
-     * Summary of showroomWiseSupplier
-     * @param mixed $showroomId
-     * @return \Illuminate\Http\JsonResponse
+     * @param $showroomId
+     * @return JsonResponse
      */
-    public function showroomWiseSupplier($showroomId)
+    public function showroomWiseSupplier($showroomId): JsonResponse
     {
         try {
             $suppliers = Supplier::where('showroom_id', $showroomId)->get();
-            
+
             if ($suppliers->isEmpty()) {
                 return $this->errorResponse('No suppliers found for the specified showroom.', null, Response::HTTP_NOT_FOUND);
             }
-            
+
             return $this->successResponse('Suppliers fetched successfully.', $suppliers, Response::HTTP_OK);
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to fetch suppliers for the showroom.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
     /**
-     * Summary of update
-     * @param \Illuminate\Http\Request $request
-     * @param mixed $id
-     * @return \Illuminate\Http\JsonResponse
+     * @param Request $request
+     * @param $id
+     * @return JsonResponse
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id): JsonResponse
     {
         try {
             $validated = $request->validate([
@@ -118,12 +119,12 @@ class SupplierController extends Controller
             return $this->errorResponse('Failed to update supplier.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
     /**
-     * Summary of destroy
-     * @param mixed $id
-     * @return mixed|\Illuminate\Http\JsonResponse
+     * @param $id
+     * @return JsonResponse
      */
-    public function destroy($id)
+    public function destroy($id): JsonResponse
     {
         try {
             $supplier = Supplier::findOrFail($id);
