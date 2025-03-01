@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 use App\Traits\ResponseTrait;
+use Illuminate\Support\Facades\Cache;
 
 class AuthController extends Controller
 {
@@ -36,11 +37,20 @@ class AuthController extends Controller
                 'role_type' => 'Admin',
             ]);
 
-            $token = $user->createToken('API Token')->plainTextToken;
+            // Generate token
+            $tokenResult = $user->createToken('API Token');
+            $token = $tokenResult->plainTextToken;
+            $expiryTime = now()->addDays(1); // Set token expiry time
+
+            // Update expires_at column
+            $user->tokens()->where('id', $tokenResult->accessToken->id)->update(['expires_at' => $expiryTime]);
+
+            // Store expiry in cache
+            Cache::put('token_expiry_' . $user->id, $expiryTime, $expiryTime);
 
             return $this->successResponse([
                 'accessToken' => $token,
-                'accessExpiresAt' => Carbon::now()->addDays(7)->toISOString(),
+                'accessExpiresAt' => $expiryTime->toISOString(),
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -74,11 +84,26 @@ class AuthController extends Controller
                 return $this->errorResponse('Invalid credentials', [], 401);
             }
 
-            $token = $user->createToken('API Token')->plainTextToken;
+            // Generate new token
+            $tokenResult = $user->createToken('API Token');
+            $token = $tokenResult->plainTextToken;
 
+            // Set token expiry time (7 days from now)
+
+            //$expiryTime = now()->addSecond(30); // Set token expiry time
+            //Cache::put('token_expiry_' . $user->id, $expiryTime, 30);
+
+            $expiryTime = now()->addDays(1);
+
+            // Update expires_at column
+            $user->tokens()->where('id', $tokenResult->accessToken->id)->update(['expires_at' => $expiryTime]);
+            
+            // Store expiry in cache
+            Cache::put('token_expiry_' . $user->id, $expiryTime, $expiryTime);
+            
             return $this->successResponse([
                 'accessToken' => $token,
-                'accessExpiresAt' => Carbon::now()->addDays(7)->toISOString(),
+                'accessExpiresAt' => $expiryTime->toISOString(),
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,
