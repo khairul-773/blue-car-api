@@ -4,99 +4,107 @@ namespace App\Http\Controllers;
 
 use App\Models\Brand;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Validation\ValidationException;
-use App\Traits\ApiResponse;
-
+use App\Traits\ResponseTrait;
+use App\Services\QueryFilterService;
 class BrandController extends Controller
 {
-    use ApiResponse;
+    use ResponseTrait;
+
     /**
-     * Summary of index
-     * @return \Illuminate\Http\JsonResponse
+     * Display a listing of the brands.
      */
-    public function index()
+    public function index(Request $request): JsonResponse
     {
         try {
-            $brands = Brand::all();
-            return $this->successResponse('Brands fetched successfully', $brands, statusCode: Response::HTTP_OK);
+            $brands = QueryFilterService::applyFilters(Brand::query(), $request, ['name', 'created_at']);
+
+            $pagination = [
+                'page' => $brands->currentPage(),
+                'pageSize' => $brands->perPage(),
+                'totalPages' => $brands->lastPage(),
+                'totalCount' => $brands->total(),
+            ];
+
+            return $this->successResponse($brands->items(), 'Brands retrieved successfully', Response::HTTP_OK, $pagination);
         } catch (\Exception $e) {
-            return $this->errorResponse('Failed to fetch brands.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to fetch brands.', $e->getMessage());
         }
     }
+
     /**
-     * Summary of store
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * Store a newly created brand.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
+            // Validate incoming request
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
             ]);
 
+            // Create brand
             $brand = Brand::create($validated);
-            return $this->successResponse('Brand created successfully', $brand, Response::HTTP_CREATED);
+            return $this->successResponse($brand, 'Brand created successfully', Response::HTTP_CREATED);
         } catch (ValidationException $e) {
-            return $this->errorResponse('Validation Error', $e->validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
+            // Return validation error response
+            return $this->validationErrorResponse($e);
         } catch (\Exception $e) {
-            return $this->errorResponse('Failed to create brand.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            // Return general error response
+            return $this->errorResponse('Failed to create brand.', $e->getMessage());
         }
     }
+
     /**
-     * Summary of show
-     * @param mixed $id
-     * @return \Illuminate\Http\JsonResponse
+     * Display the specified brand.
      */
-    public function show($id)
+    public function show(Brand $brand): JsonResponse
     {
         try {
-            $brand = Brand::findOrFail($id);
-            return $this->successResponse('Brand retrieved successfully', $brand, Response::HTTP_OK);
+            return $this->successResponse($brand, 'Brand retrieved successfully');
         } catch (\Exception $e) {
-            return $this->errorResponse('Brand not found.', $e->getMessage(), Response::HTTP_NOT_FOUND);
+            return $this->errorResponse('Failed to retrieve brand.', $e->getMessage(), Response::HTTP_NOT_FOUND);
         }
     }
+
     /**
-     * Summary of update
-     * @param \Illuminate\Http\Request $request
-     * @param mixed $id
-     * @return \Illuminate\Http\JsonResponse
+     * Update the specified brand.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, Brand $brand): JsonResponse
     {
         try {
+            // Validate incoming request
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string',
             ]);
 
-            $brand = Brand::findOrFail($id);
+            // Update brand
             $brand->update($validated);
-
-            return $this->successResponse('Brand updated successfully', $brand, Response::HTTP_OK);
+            return $this->successResponse($brand, 'Brand updated successfully');
         } catch (ValidationException $e) {
-            return $this->errorResponse('Validation Error', $e->validator->errors(), Response::HTTP_UNPROCESSABLE_ENTITY);
+            // Return validation error response
+            return $this->validationErrorResponse($e);
         } catch (\Exception $e) {
-            return $this->errorResponse('Failed to update brand.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            // Return general error response
+            return $this->errorResponse('Failed to update brand.', $e->getMessage());
         }
     }
+
     /**
-     * Summary of destroy
-     * @param mixed $id
-     * @return \Illuminate\Http\JsonResponse
+     * Remove the specified brand.
      */
-    public function destroy($id)
+    public function destroy(Brand $brand): JsonResponse
     {
         try {
-            $brand = Brand::findOrFail($id);
+            // Delete brand
             $brand->delete();
-
-            return $this->successResponse('Brand deleted successfully', null, Response::HTTP_NO_CONTENT);
+            return $this->successResponse(null, 'Brand deleted successfully');
         } catch (\Exception $e) {
-            return $this->errorResponse('Failed to delete brand.', $e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->errorResponse('Failed to delete brand.', $e->getMessage());
         }
     }
 }

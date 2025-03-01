@@ -6,68 +6,126 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use App\Traits\ApiResponse;
+use Carbon\Carbon;
+use App\Traits\ResponseTrait;
+use Illuminate\Support\Facades\Cache;
 
 class AuthController extends Controller
 {
-    use ApiResponse;
+    use ResponseTrait;
+
     /**
-     * Summary of register
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * Register a new user
      */
     public function register(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users',
+                'password' => 'required|string|min:8|confirmed',
+            ]);
 
-        if ($validator->fails()) {
-            return $this->errorResponse('Validation error', $validator->errors(), 400);
+            if ($validator->fails()) {
+                return $this->errorResponse('Validation errors', $validator->errors()->toArray(), 400);
+            }
+
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'role_type' => 'Admin',
+            ]);
+
+            // Generate token
+            $tokenResult = $user->createToken('API Token');
+            $token = $tokenResult->plainTextToken;
+            $expiryTime = now()->addDays(1); // Set token expiry time
+
+            // Update expires_at column
+            $user->tokens()->where('id', $tokenResult->accessToken->id)->update(['expires_at' => $expiryTime]);
+
+            // Store expiry in cache
+            Cache::put('token_expiry_' . $user->id, $expiryTime, $expiryTime);
+
+            return $this->successResponse([
+                'accessToken' => $token,
+                'accessExpiresAt' => $expiryTime->toISOString(),
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'type' => $user->role_type,
+                ],
+            ], 'Registration successful', 201);
+        } catch (\Exception $e) {
+            return $this->errorResponse('Registration failed', $e->getMessage(), 500);
         }
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        $token = $user->createToken($user->name)->plainTextToken;
-
-        return $this->successResponse('Registration successful', ['token' => $token, 'user' => $user], 201);
     }
+
     /**
-     * Summary of login
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * Login user
      */
     public function login(Request $request)
     {
-        $user = User::where('email', $request->email)->first();
+        try {
+            $validator = Validator::make($request->all(), [
+                'email' => 'required|string|email',
+                'password' => 'required|string|min:8',
+            ]);
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return $this->errorResponse('Invalid credentials', null, 401);
+            if ($validator->fails()) {
+                return $this->errorResponse('Validation errors', $validator->errors()->toArray(), 400);
+            }
+
+            $user = User::where('email', $request->email)->first();
+
+            if (!$user || !Hash::check($request->password, $user->password)) {
+                return $this->errorResponse('Invalid credentials', [], 401);
+            }
+
+            // Generate new token
+            $tokenResult = $user->createToken('API Token');
+            $token = $tokenResult->plainTextToken;
+
+            // Set token expiry time (7 days from now)
+
+            //$expiryTime = now()->addSecond(30); // Set token expiry time
+            //Cache::put('token_expiry_' . $user->id, $expiryTime, 30);
+
+            $expiryTime = now()->addDays(1);
+
+            // Update expires_at column
+            $user->tokens()->where('id', $tokenResult->accessToken->id)->update(['expires_at' => $expiryTime]);
+            
+            // Store expiry in cache
+            Cache::put('token_expiry_' . $user->id, $expiryTime, $expiryTime);
+            
+            return $this->successResponse([
+                'accessToken' => $token,
+                'accessExpiresAt' => $expiryTime->toISOString(),
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'type' => $user->role_type,
+                ],
+            ], 'Sign-in successful', 200);
+        } catch (\Exception $e) {
+            return $this->errorResponse('Login failed', $e->getMessage(), 500);
         }
-
-        $token = $user->createToken($user->name)->plainTextToken;
-
-        return $this->successResponse('Login successful', ['token' => $token, 'user' => $user], 200);
     }
     /**
-     * Summary of logout
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * Logout user
      */
     public function logout(Request $request)
     {
-        // Revoke the current user's token
-        $request->user()->currentAccessToken()->delete();
+        try {
+            $request->user()->currentAccessToken()->delete();
 
-        // Revoke the current user's all token
-        //$request->user()->token()->delete();
-
-        return $this->successResponse('Logged out successfully.', [], 200);
+            return $this->successResponse(null, 'Logged out successfully', 200);
+        } catch (\Exception $e) {
+            return $this->errorResponse('Logout failed', $e->getMessage(), 500);
+        }
     }
 }
